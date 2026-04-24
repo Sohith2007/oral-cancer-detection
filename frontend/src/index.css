@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+@theme {
+  --color-medicalPrimary: #0ea5e9;
+  --color-medicalSecondary: #f0f9ff;
+  --color-danger: #ef4444;
+  --color-safe: #22c55e;
+  --color-warning: #eab308;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", "Roboto",
+    "Ubuntu", "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-slate-50);
+}
