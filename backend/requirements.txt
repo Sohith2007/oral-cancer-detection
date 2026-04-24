@@ -3,8 +3,8 @@ uvicorn[standard]
 python-multipart
 pydantic
 pydantic-settings
-sqlalchemy
-psycopg2-binary
+supabase
 python-dotenv
 torch
 torchvision
+google-generativeai
