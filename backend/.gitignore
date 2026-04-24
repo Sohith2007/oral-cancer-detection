@@ -1,0 +1,25 @@
+# Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# Environment variables — never commit secrets
+.env
+
+# Uploads — real patient data should never be committed
+uploads/*
+!uploads/.gitkeep
+
+# PyTorch model weights
+*.pt
+*.pth
+*.bin
+
+# General
+.DS_Store
+*.log
