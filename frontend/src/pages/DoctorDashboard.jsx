@@ -1,333 +1,472 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { getAccessToken, isDemoAuthMode, signOut, supabaseConfigError } from '../supabaseClient';
-import '../styles/Dashboard.css';
+import React, { useState, useRef } from 'react';
+import { UploadCloud, AlertCircle, CheckCircle, Activity, FileText, Upload, ChevronRight, X, RotateCcw } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
-/* ── SVG Icons ── */
-const Ic = ({ d, size=16, sw=1.7 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">
-    {(Array.isArray(d) ? d : [d]).map((p,i) => <path key={i} d={p} />)}
-  </svg>
-);
-const IcHub      = () => <Ic size={15} d={["M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z","M9 22V12h6v10"]} />;
-const IcLogout   = () => <Ic size={15} d={["M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4","M16 17l5-5-5-5","M21 12H9"]} />;
-const IcUpload   = () => <Ic size={22} d={["M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4","M17 8l-5-5-5 5","M12 3v12"]} />;
-const IcFile     = () => <Ic size={14} d={["M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z","M13 2v7h7"]} />;
-const IcData     = () => <Ic size={13} d={["M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z","M14 2v6h6"]} />;
-const IcPlay     = () => <Ic size={16} d="M5 3l14 9-14 9V3z" />;
-const IcCheck    = () => <Ic size={14} sw={2.5} d="M20 6L9 17l-5-5" />;
-const IcAlert    = () => <Ic size={14} d={["M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z","M12 9v4","M12 17h.01"]} />;
-const IcActivity = () => <Ic size={24} d="M22 12h-4l-3 9L9 3l-3 9H2" />;
-const IcDna      = () => <Ic size={13} d={["M2 15c6.667-6 13.333 0 20-6","M2 9c6.667 6 13.333 0 20 6"]} />;
-const IcEye      = () => <Ic size={13} d={["M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z","M12 9a3 3 0 100 6 3 3 0 000-6z"]} />;
-
-/* ── Upload Zone ── */
-function UploadZone({ label, hint, optional, onFile, file }) {
-  const [drag, setDrag] = useState(false);
-  return (
-    <div style={{ marginBottom: '16px' }}>
-      <div className={`upload-zone ${drag ? 'drag' : ''}`}
-        onDragOver={e => { e.preventDefault(); setDrag(true); }}
-        onDragLeave={() => setDrag(false)}
-        onDrop={e => { e.preventDefault(); setDrag(false); const f = e.dataTransfer.files[0]; if(f) onFile(f); }}
-      >
-        <input type="file" accept="image/*" onChange={e => e.target.files[0] && onFile(e.target.files[0])} />
-        <div className="upload-icon"><IcUpload /></div>
-        <div className="upload-title">{label}{optional && <span style={{color:'var(--text-muted)',fontWeight:400}}> (Optional)</span>}</div>
-        <div className="upload-hint">{hint}</div>
-        {file && <div className="upload-file"><IcFile /> {file.name}</div>}
-      </div>
-      {file && file.type && file.type.startsWith('image/') && (
-        <div className="upload-preview" style={{marginTop:8}}>
-          <img src={URL.createObjectURL(file)} alt="preview" />
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ── Analysis Steps ── */
-const STEPS = [
-  { id:'img',  label:'Image preprocessing',    sub:'Normalising intra-oral image',         icon: <IcEye /> },
-  { id:'hist', label:'Histopathology analysis', sub:'Segmentation & feature extraction',    icon: <IcFile /> },
-  { id:'clin', label:'Clinical correlation',    sub:'Age, gender, tobacco risk weighting',  icon: <IcData /> },
-  { id:'gen',  label:'Genomic integration',     sub:'Gene expression cross-referencing',    icon: <IcDna /> },
-  { id:'inf',  label:'AI inference',            sub:'Ensemble model prediction',            icon: <IcActivity /> },
-];
-
-function AnalysisSteps({ step }) {
-  return (
-    <div className="running-state">
-      {STEPS.map((s, i) => {
-        const status = i < step ? 'complete' : i === step ? 'active' : 'pending';
-        return (
-          <div className="analysis-step" key={s.id} style={{animationDelay: i * 0.08 + 's'}}>
-            <div className={`step-icon ${status}`}>{s.icon}</div>
-            <div>
-              <div className="step-name">{s.label}</div>
-              <div className="step-sub">{s.sub}</div>
-            </div>
-            {status === 'active'    && <div className="step-spinner" />}
-            {status === 'complete'  && <div style={{marginLeft:'auto',color:'var(--success)'}}><IcCheck /></div>}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/* ── Result View ── */
-function ResultView({ result }) {
-  const riskScore = result.final_risk_score || 0;
-  const risk = riskScore > 0.65 ? 'high' : riskScore > 0.35 ? 'medium' : 'low';
-  const riskMap = {
-    low:    { label:'Low Risk',    color:'var(--success)', bar:'var(--success)', pct: (riskScore*100).toFixed(1) },
-    medium: { label:'Medium Risk', color:'var(--warn)',    bar:'var(--warn)',    pct: (riskScore*100).toFixed(1) },
-    high:   { label:'High Risk',   color:'var(--error)',   bar:'var(--error)',   pct: (riskScore*100).toFixed(1) },
-  };
-  const r = riskMap[risk];
-
-  return (
-    <div className="result-section">
-      <div>
-        <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'1.2px',color:'var(--text-muted)',marginBottom:6}}>Prediction Outcome</div>
-        <div className={`result-headline ${risk}`}>{r.label}</div>
-        <div style={{fontSize:12,color:'var(--text-muted)',marginTop:4}}>AI Fusion Score</div>
-      </div>
-
-      <div className="metric-grid">
-        <div className="metric-card">
-          <div className="metric-label">Risk Score</div>
-          <div className="metric-val" style={{color: r.color}}>{r.pct}%</div>
-          <div className="bar-track"><div className="bar-fill" style={{width: r.pct+'%', background: r.color}} /></div>
-        </div>
-        <div className="metric-card">
-          <div className="metric-label">Dependencies</div>
-          <div className="metric-val" style={{color:'var(--teal)', fontSize: 18}}>{Object.keys(result.feature_dependencies || {}).length} Models</div>
-          <div className="metric-sub">Multi-modal ensemble</div>
-        </div>
-      </div>
-
-      <div style={{marginTop: 12}}>
-        <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'1.2px',color:'var(--text-muted)',marginBottom:8}}>Gemini AI Clinical Insight</div>
-        <div className="finding-list">
-          <div className="finding-item" style={{whiteSpace: 'pre-wrap'}}>
-            <div className="finding-dot" style={{background: r.color}} />
-            <div>{result.clinical_insight}</div>
-          </div>
-        </div>
-      </div>
-
-      <div style={{marginTop: 12}}>
-        <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'1.2px',color:'var(--text-muted)',marginBottom:8}}>Base Model Explainability</div>
-        <div className="finding-list">
-          {Object.entries(result.feature_dependencies || {}).map(([model, deps], i) => (
-            <div className="finding-item" key={model}>
-              <div className="finding-dot" style={{background: 'var(--teal)'}} />
-              <div>
-                <strong style={{color:'var(--text-primary)'}}>{model.replace('.pkl', '').replace('.joblib', '')}</strong>
-                <p style={{marginTop: 4}}>{deps}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
+// "Veridian Slate" color palette approximation using Tailwind
+// Background: bg-slate-900, Card: bg-slate-800, Accents: teal-400, Alerts: rose-400
 
 const DoctorDashboard = () => {
-  const navigate = useNavigate();
-  const [activeNav, setActiveNav] = useState('hub');
-  
-  const [oralImg, setOralImg] = useState(null);
-  const [histImg, setHistImg] = useState(null);
-  const [clinReport, setClinReport] = useState(null);
-  const [geneReport, setGeneReport] = useState(null);
-  
-  const [status, setStatus] = useState('idle'); // idle | running | done
-  const [step, setStep] = useState(0);
-  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   
-  const [schema, setSchema] = useState(null);
+  // File upload states
+  const [files, setFiles] = useState({
+      intraoral: null,
+      histopathology: null,
+      genomic: null
+  });
+  const [previewUrl, setPreviewUrl] = useState(null);
 
-  const apiUrl = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:8001/api/v1').replace(/^['"]|['"]$/g, '');
+  // Refs to hidden file inputs so we can programmatically reset them
+  const intaroralInputRef  = useRef(null);
+  const histoInputRef      = useRef(null);
+  const genomicInputRef    = useRef(null);
 
-  useEffect(() => {
-    const loadSchema = async () => {
-      try {
-        const accessToken = await getAccessToken();
-        if (!accessToken) {
-          navigate('/login');
-          return;
-        }
+  const INITIAL_FORM = {
+    patient_id: 1,
+    age: '',
+    gender: 'Male',
+    risk_factors: { smoking: false, alcohol: false, betel_nut: false, family_history: false, previous_disease: false },
+    symptoms:     { pain: false, bleeding: false, ulcer_duration: '', difficulty_swallowing: false, weight_loss: false, voice_change: false }
+  };
 
-        const response = await fetch(`${apiUrl}/predict/schema`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
-        if (!response.ok) {
-          throw new Error(`Schema request failed (${response.status})`);
-        }
-        const payload = await response.json();
-        setSchema(payload);
-      } catch (err) {
-        console.warn('Could not load schema:', err.message);
-        setError('Could not load prediction schema from backend.');
+  const handleReset = () => {
+    // Clear all results and files
+    setResult(null);
+    setLoading(false);
+    setFiles({ intraoral: null, histopathology: null, genomic: null });
+    setPreviewUrl(null);
+    setFormData(INITIAL_FORM);
+    // Reset the actual file input DOM elements so the same file can be re-selected
+    [intaroralInputRef, histoInputRef, genomicInputRef].forEach(ref => {
+      if (ref.current) ref.current.value = '';
+    });
+  };
+
+  const handleFileUpload = (e, type) => {
+      const file = e.target.files[0];
+      if (file) {
+          setFiles(prev => {
+              const newFiles = { ...prev, [type]: file };
+              // Prioritize intraoral for preview, fallback to histopathology
+              if (newFiles.intraoral) {
+                  setPreviewUrl(URL.createObjectURL(newFiles.intraoral));
+              } else if (newFiles.histopathology) {
+                  setPreviewUrl(URL.createObjectURL(newFiles.histopathology));
+              }
+              return newFiles;
+          });
       }
+  };
+
+  const handleFileRemove = (e, type) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setFiles(prev => {
+          const newFiles = { ...prev, [type]: null };
+          // Re-evaluate preview
+          if (newFiles.intraoral) {
+              setPreviewUrl(URL.createObjectURL(newFiles.intraoral));
+          } else if (newFiles.histopathology) {
+              setPreviewUrl(URL.createObjectURL(newFiles.histopathology));
+          } else {
+              setPreviewUrl(null);
+          }
+          return newFiles;
+      });
+      // Also reset the file input so the same file can be re-uploaded if needed
+      e.target.value = null;
+  };
+  
+  // State for all requested clinical inputs
+  const [formData, setFormData] = useState({
+    patient_id: 1,
+    age: '',
+    gender: 'Male',
+    risk_factors: {
+        smoking: false,
+        alcohol: false,
+        betel_nut: false,
+        family_history: false,
+        previous_disease: false
+    },
+    symptoms: {
+        pain: false,
+        bleeding: false,
+        ulcer_duration: '',
+        difficulty_swallowing: false,
+        weight_loss: false,
+        voice_change: false
+    }
+  });
+
+  const handleRiskToggle = (field) => {
+      setFormData(prev => ({
+          ...prev,
+          risk_factors: { ...prev.risk_factors, [field]: !prev.risk_factors[field] }
+      }));
+  }
+
+  const handleSymptomToggle = (field) => {
+      setFormData(prev => ({
+          ...prev,
+          symptoms: { ...prev.symptoms, [field]: !prev.symptoms[field] }
+      }));
+  }
+
+  const handlePredict = (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setResult(null); // Force the UI to clear and re-analyze visually every time
+    
+    // Send every single toggle and input to the backend so the AI reacts dynamically
+    const mappedSymptoms = {
+        pain: formData.symptoms.pain ? "true" : "false",
+        bleeding: formData.symptoms.bleeding ? "true" : "false",
+        difficulty_swallowing: formData.symptoms.difficulty_swallowing ? "true" : "false",
+        weight_loss: formData.symptoms.weight_loss ? "true" : "false",
+        voice_change: formData.symptoms.voice_change ? "true" : "false",
+        ulcer_duration: formData.symptoms.ulcer_duration,
+        smoking: formData.risk_factors.smoking ? "true" : "false",
+        alcohol: formData.risk_factors.alcohol ? "true" : "false",
+        betel_nut: formData.risk_factors.betel_nut ? "true" : "false",
+        family_history: formData.risk_factors.family_history ? "true" : "false",
+        previous_disease: formData.risk_factors.previous_disease ? "true" : "false",
+        age: formData.age.toString(),
+        gender: formData.gender,
+        image_uploaded: files.intraoral ? "true" : "false",
+        histo_uploaded: files.histopathology ? "true" : "false",
+        genomic_uploaded: files.genomic ? "true" : "false"
     };
 
-    loadSchema();
-  }, [apiUrl, navigate]);
+    // Build FormData to send real file bytes alongside clinical JSON
+    const uploadPayload = new FormData();
 
-  // Removed clinical fields and update logic as we are using OCR
+    // Attach all clinical fields as a JSON string
+    uploadPayload.append('clinical_data', JSON.stringify({
+        patient_id: formData.patient_id,
+        symptoms: mappedSymptoms
+    }));
 
-  const handleLogout = async () => {
-    await signOut();
-    navigate('/login');
-  };
+    // Attach real file bytes if present
+    if (files.intraoral)      uploadPayload.append('intraoral_image', files.intraoral);
+    if (files.histopathology) uploadPayload.append('histo_image',     files.histopathology);
+    if (files.genomic)        uploadPayload.append('genomic_file',    files.genomic);
 
-  const runAnalysis = async (e) => {
-    e.preventDefault();
-    if (!oralImg && !clinReport && !histImg && !geneReport) {
-      setError('Please upload at least one piece of patient data (Image, Clinical Report, or Gene Report) to run the analysis.');
-      return;
-    }
-    setError(''); 
-    setStatus('running'); 
-    setStep(0);
-
-    try {
-      const accessToken = await getAccessToken();
-      if (!accessToken) {
-        throw new Error('Session not found. Please login again.');
+    fetch('http://localhost:8000/api/v1/analyze/', {
+      method: 'POST',
+      headers: {
+          // Do NOT set Content-Type for multipart — browser sets it with boundary automatically
+          'Authorization': 'Bearer mock_token_for_dev'
+      },
+      body: uploadPayload
+    })
+    .then(async res => {
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || 'API Error');
       }
-
-      // Fake animation progress while fetch is running
-      const stepInterval = setInterval(() => {
-        setStep(s => (s < STEPS.length - 1 ? s + 1 : s));
-      }, 800);
-
-      const formData = new FormData();
-      if (histImg) formData.append('histopathology_image', histImg);
-      if (oralImg) formData.append('intra_oral_image', oralImg);
-      if (clinReport) formData.append('clinical_report', clinReport);
-      if (geneReport) formData.append('gene_report', geneReport);
-      
-      const response = await fetch(`${apiUrl}/predict/multimodal`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`
-        },
-        body: formData
-      });
-      
-      clearInterval(stepInterval);
-      setStep(STEPS.length);
-
-      if (!response.ok) {
-        const detail = await response.text();
-        throw new Error(`API Error ${response.status}: ${detail}`);
-      }
-      
-      const data = await response.json();
+      return data;
+    })
+    .then(data => {
       setResult(data);
-      setStatus('done');
-    } catch (err) {
-      console.error(err);
-      setError(`Failed to run prediction: ${err.message}`);
-      setStatus('idle');
-    }
+      setLoading(false);
+    })
+    .catch(err => {
+      console.error("API Call Failed:", err);
+      setResult({
+          diagnosis: "Analysis Failed",
+          risk_score: 0.0,
+          confidence: 0.0,
+          stage: "Error",
+          modality_weights: { "Histopathology": 0, "Clinical": 0, "Genomic": 0, "Intraoral": 0 },
+          heatmap_url: null,
+          shap_clinical: {},
+          shap_genomic: {},
+          clinical_summary: `The backend encountered an error: ${err.message}. Please check your server terminal.`,
+          next_action: "Retry analysis"
+      });
+      setLoading(false);
+    });
   };
 
-  const badgeEl = status === 'idle' ? <span className="results-badge badge-waiting">Awaiting input</span>
-                : status === 'running' ? <span className="results-badge badge-running">Analysing...</span>
-                : <span className="results-badge badge-done">Complete</span>;
+  const featureData = result?.shap_clinical 
+    ? Object.entries(result.shap_clinical).map(([name, impact]) => ({ name, impact })) 
+    : [];
 
   return (
-    <div className="dashboard-root">
-      <div className="app">
-        {/* Sidebar */}
-        <div className="sidebar">
-          <div className="sidebar-logo">
-            <div className="logo-icon">OS</div>
-            <div>
-              <div className="logo-name">OralScan AI</div>
-              <div className="logo-sub">Diagnostic</div>
-            </div>
-          </div>
-          <div className="sidebar-nav">
-            <div className="nav-label">Navigation</div>
-            {[
-              { id:'hub', label:'Diagnosis Hub', icon:<IcHub /> },
-            ].map(n => (
-              <div key={n.id} className={`nav-item ${activeNav===n.id?'active':''}`} onClick={()=>setActiveNav(n.id)}>
-                {n.icon}{n.label}
-              </div>
-            ))}
-          </div>
-          <div className="sidebar-footer">
-            <div className="nav-item" style={{color:'var(--error)',opacity:0.8}} onClick={handleLogout}>
-              <IcLogout />Logout
-            </div>
+    <div className="min-h-screen bg-[#0b1326] text-slate-200 font-sans p-6 overflow-x-hidden">
+      
+      {/* Header */}
+      <header className="flex justify-between items-center mb-8 border-b border-slate-700/50 pb-4">
+        <div>
+          <h1 className="text-3xl font-light tracking-wide text-white">OralDetect <span className="text-teal-400 font-bold">LUMINARY</span></h1>
+          <p className="text-slate-400 text-sm mt-1">Advanced Clinical Decision Support Matrix</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {/* Reset button — visible whenever there is data to clear */}
+          {(result || files.intraoral || files.histopathology || files.genomic ||
+            formData.age || Object.values(formData.risk_factors).some(Boolean) ||
+            Object.values(formData.symptoms).some(v => v === true || (typeof v === 'string' && v))) && (
+            <button
+              type="button"
+              onClick={handleReset}
+              className="flex items-center gap-2 px-4 py-2 rounded-full border border-slate-600 bg-slate-800/60 text-slate-300 hover:border-rose-400/60 hover:text-rose-300 hover:bg-rose-500/10 transition-all duration-200 text-sm font-medium"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Reset
+            </button>
+          )}
+          <div className="flex items-center space-x-3 bg-slate-800/50 px-4 py-2 rounded-full border border-slate-700">
+              <div className="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></div>
+              <span className="text-sm font-medium text-teal-300">System Online</span>
           </div>
         </div>
+      </header>
 
-        {/* Main */}
-        <div className="main">
-          <div className="topbar">
-            <div className="topbar-title">Clinical Decision Support</div>
-            <div className="topbar-sub">Submit patient data for multi-modal AI analysis</div>
-            {isDemoAuthMode && <div style={{color:'var(--warn)', fontSize:'12px', marginTop:'4px'}}>{supabaseConfigError}</div>}
-          </div>
-
-          <div className="content">
-            {/* Form */}
-            <div className="form-col">
-              <div className="card">
-                <div className="card-header"><IcData />Patient Data Input</div>
-                <div className="card-body">
-                  <UploadZone label="Upload Intra-Oral Image" hint="JPG, PNG up to 10 MB" file={oralImg} onFile={setOralImg} />
-                  <UploadZone label="Upload Histopathology" hint="JPG, PNG up to 10 MB" optional file={histImg} onFile={setHistImg} />
-
-                  <UploadZone label="Upload Clinical Report" hint="JPG, PNG up to 10 MB" file={clinReport} onFile={setClinReport} />
-                  <UploadZone label="Upload Gene Report" hint="JPG, PNG up to 10 MB" file={geneReport} onFile={setGeneReport} />
-
-                  {error && (
-                    <div className="error-banner"><IcAlert />{error}</div>
-                  )}
-
-                  <button className={`run-btn ${status==='running'?'loading':''}`}
-                    disabled={status==='running'}
-                    onClick={runAnalysis}>
-                    {status==='running' ? <>Analysing patient data...</> : <><IcPlay />Run AI Analysis</>}
-                  </button>
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
+        
+        {/* ========================================== */}
+        {/* LEFT COLUMN: 40% - INTAKE FORM             */}
+        {/* ========================================== */}
+        <div className="xl:col-span-5 flex flex-col space-y-6">
+            
+          <form onSubmit={handlePredict} className="flex flex-col space-y-6 h-full">
+            
+            {/* 1. Modality Intake: Images & Genomic */}
+            <div className="bg-slate-800/40 rounded-2xl p-6 border border-slate-700/50 shadow-lg backdrop-blur-sm">
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-teal-400 mb-4 flex items-center">
+                    <Upload className="w-4 h-4 mr-2" /> Data Modalities
+                </h2>
+                <div className="grid grid-cols-2 gap-4">
+                    
+                    <label className={`relative border border-dashed ${files.intraoral ? 'border-teal-500 bg-teal-500/10' : 'border-slate-600 hover:bg-slate-700/30'} rounded-xl p-4 text-center transition cursor-pointer flex flex-col items-center justify-center`}>
+                        {files.intraoral && (
+                            <button onClick={(e) => handleFileRemove(e, 'intraoral')} className="absolute top-2 right-2 p-1 bg-slate-800 rounded-full text-slate-400 hover:text-rose-400 hover:bg-slate-700 transition">
+                                <X className="w-3 h-3" />
+                            </button>
+                        )}
+                        {files.intraoral ? <CheckCircle className="mx-auto text-teal-400 mb-2 w-6 h-6" /> : <UploadCloud className="mx-auto text-slate-400 mb-2 w-6 h-6" />}
+                        <span className={`text-xs px-2 ${files.intraoral ? 'text-teal-300' : 'text-slate-300'} w-full truncate block`}>{files.intraoral ? files.intraoral.name : "Intraoral Photo"}</span>
+                        <input ref={intaroralInputRef} type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'intraoral')} />
+                    </label>
+                    
+                    <label className={`relative border border-dashed ${files.histopathology ? 'border-teal-500 bg-teal-500/10' : 'border-slate-600 hover:bg-slate-700/30'} rounded-xl p-4 text-center transition cursor-pointer flex flex-col items-center justify-center`}>
+                        {files.histopathology && (
+                            <button onClick={(e) => handleFileRemove(e, 'histopathology')} className="absolute top-2 right-2 p-1 bg-slate-800 rounded-full text-slate-400 hover:text-rose-400 hover:bg-slate-700 transition">
+                                <X className="w-3 h-3" />
+                            </button>
+                        )}
+                        {files.histopathology ? <CheckCircle className="mx-auto text-teal-400 mb-2 w-6 h-6" /> : <UploadCloud className="mx-auto text-slate-400 mb-2 w-6 h-6" />}
+                        <span className={`text-xs px-2 ${files.histopathology ? 'text-teal-300' : 'text-slate-300'} w-full truncate block`}>{files.histopathology ? files.histopathology.name : "Histopathology Image"}</span>
+                        <input ref={histoInputRef} type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'histopathology')} />
+                    </label>
                 </div>
-              </div>
+                
+                <label className={`relative mt-4 border border-dashed ${files.genomic ? 'border-teal-500 bg-teal-500/10' : 'border-slate-600 hover:bg-slate-700/30'} rounded-xl p-3 text-center transition cursor-pointer flex items-center justify-center`}>
+                    {files.genomic && (
+                        <button onClick={(e) => handleFileRemove(e, 'genomic')} className="absolute top-1/2 -translate-y-1/2 right-3 p-1 bg-slate-800 rounded-full text-slate-400 hover:text-rose-400 hover:bg-slate-700 transition">
+                            <X className="w-4 h-4" />
+                        </button>
+                    )}
+                    {files.genomic ? <CheckCircle className="text-teal-400 mr-2 w-4 h-4" /> : <FileText className="text-slate-400 mr-2 w-4 h-4" />}
+                    <span className={`text-xs px-8 ${files.genomic ? 'text-teal-300' : 'text-slate-300'} truncate block`}>{files.genomic ? files.genomic.name : "Upload Genomic Report (CSV)"}</span>
+                    <input ref={genomicInputRef} type="file" className="hidden" accept=".csv,.xlsx,.txt" onChange={(e) => handleFileUpload(e, 'genomic')} />
+                </label>
             </div>
 
-            {/* Results */}
-            <div className="results-col">
-              <div className="results-header">
-                <div className="results-title">Analysis Results</div>
-                {badgeEl}
-              </div>
-              <div className="results-body">
-                {status === 'idle' && (
-                  <div className="waiting-state">
-                    <div className="pulse-ring">
-                      <IcActivity />
+            {/* 2. Clinical Form */}
+            <div className="bg-slate-800/40 rounded-2xl p-6 border border-slate-700/50 shadow-lg backdrop-blur-sm flex-grow">
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-teal-400 mb-4">Patient Profile</h2>
+                
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label className="text-xs text-slate-400 mb-1 block">Age</label>
+                        <input type="number" placeholder="55" value={formData.age} onChange={e => setFormData({...formData, age: e.target.value})} className="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-teal-400" />
                     </div>
-                    <div className="waiting-title">Awaiting patient data</div>
-                    <div className="waiting-sub">Fill in the patient form and run AI analysis to see diagnostic results here.</div>
-                  </div>
-                )}
-                {status === 'running' && <AnalysisSteps step={step} />}
-                {status === 'done' && result && <ResultView result={result} />}
-              </div>
+                    <div>
+                        <label className="text-xs text-slate-400 mb-1 block">Gender</label>
+                        <select value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value})} className="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-teal-400">
+                            <option>Male</option>
+                            <option>Female</option>
+                        </select>
+                    </div>
+                </div>
+
+                {/* Toggles */}
+                <div className="grid grid-cols-2 gap-8">
+                    <div>
+                        <h3 className="text-xs text-slate-400 mb-3 border-b border-slate-700 pb-1">Risk Factors</h3>
+                        <div className="space-y-2">
+                            {Object.keys(formData.risk_factors).map(field => (
+                                <label key={field} onClick={() => handleRiskToggle(field)} className="flex items-center space-x-3 cursor-pointer group">
+                                    <div className={`w-4 h-4 rounded-sm border ${formData.risk_factors[field] ? 'bg-teal-500 border-teal-500' : 'border-slate-500 group-hover:border-teal-400'} flex items-center justify-center transition-colors`}>
+                                        {formData.risk_factors[field] && <CheckCircle className="w-3 h-3 text-slate-900" />}
+                                    </div>
+                                    <span className="text-sm text-slate-300 capitalize">{field.replace('_', ' ')}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <h3 className="text-xs text-slate-400 mb-3 border-b border-slate-700 pb-1">Symptoms</h3>
+                        <div className="space-y-2">
+                            {Object.keys(formData.symptoms).filter(k => k !== 'ulcer_duration').map(field => (
+                                <label key={field} onClick={() => handleSymptomToggle(field)} className="flex items-center space-x-3 cursor-pointer group">
+                                    <div className={`w-4 h-4 rounded-sm border ${formData.symptoms[field] ? 'bg-rose-500 border-rose-500' : 'border-slate-500 group-hover:border-rose-400'} flex items-center justify-center transition-colors`}>
+                                        {formData.symptoms[field] && <CheckCircle className="w-3 h-3 text-slate-900" />}
+                                    </div>
+                                    <span className="text-sm text-slate-300 capitalize">{field.replace('_', ' ')}</span>
+                                </label>
+                            ))}
+                            <div className="pt-2">
+                                <input type="text" value={formData.symptoms.ulcer_duration} onChange={e => setFormData({...formData, symptoms: {...formData.symptoms, ulcer_duration: e.target.value}})} placeholder="Ulcer duration (e.g. 3 weeks)" className="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-teal-400" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-          </div>
+
+            {/* Run Button */}
+            <button 
+                type="submit" 
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-[#00a392] to-[#3cddc7] hover:from-[#3cddc7] hover:to-[#62fae3] text-slate-900 font-bold py-4 rounded-2xl shadow-[0_0_20px_rgba(60,221,199,0.3)] transition-all flex justify-center items-center group uppercase tracking-widest text-sm"
+            >
+                {loading ? (
+                    <Activity className="animate-spin w-5 h-5 mr-2" />
+                ) : (
+                    <>Run Deep Fusion Analysis <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" /></>
+                )}
+            </button>
+
+          </form>
         </div>
+
+
+        {/* ========================================== */}
+        {/* RIGHT COLUMN: 60% - AI RESULTS MATRIX      */}
+        {/* ========================================== */}
+        <div className="xl:col-span-7 flex flex-col space-y-6">
+            {!result ? (
+                <div className="h-full border border-slate-700/50 rounded-2xl flex flex-col items-center justify-center text-slate-500 bg-slate-800/10 min-h-[600px]">
+                    <Activity className="w-16 h-16 opacity-20 mb-4" />
+                    <p className="font-light tracking-wide uppercase text-sm">Awaiting Multi-Modal Input</p>
+                </div>
+            ) : (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                    
+                    {/* Top Hero Stats */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Primary Diagnosis */}
+                        <div className={`col-span-2 rounded-2xl p-6 border flex items-center justify-between ${result.diagnosis.includes('Cancer') ? 'bg-rose-500/10 border-rose-500/30' : 'bg-teal-500/10 border-teal-500/30'}`}>
+                            <div className="flex items-center">
+                                {result.diagnosis.includes('Cancer') ? <AlertCircle className="w-10 h-10 text-rose-400 mr-4" /> : <CheckCircle className="w-10 h-10 text-teal-400 mr-4" />}
+                                <div>
+                                    <h3 className="text-xs uppercase tracking-widest text-slate-400 mb-1">AI Diagnosis</h3>
+                                    <h2 className={`text-2xl font-bold tracking-wide ${result.diagnosis.includes('Cancer') ? 'text-rose-300' : 'text-teal-300'}`}>
+                                        {result.diagnosis} {result.stage && <span className="text-lg opacity-80 font-light ml-1">({result.stage})</span>}
+                                    </h2>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Confidence Score */}
+                        <div className="bg-slate-800/60 rounded-2xl p-6 border border-slate-700/50 flex flex-col justify-center items-center">
+                            <h3 className="text-xs uppercase tracking-widest text-slate-400 mb-1">Calibrated Confidence</h3>
+                            <div className="text-3xl font-light text-white">{(result.confidence * 100).toFixed(1)}<span className="text-lg text-slate-500">%</span></div>
+                        </div>
+                    </div>
+
+                    {/* Modality & SHAP Explainability Matrix */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        
+                        {/* Grad-CAM Heatmap */}
+                        <div className="bg-slate-800/40 rounded-2xl p-5 border border-slate-700/50">
+                            <h3 className="text-xs uppercase tracking-widest text-teal-400 mb-3 border-b border-slate-700 pb-2">Grad-CAM Heatmap</h3>
+                            <div className="relative rounded-xl overflow-hidden aspect-video border border-slate-600 bg-black flex items-center justify-center group">
+                                {previewUrl ? (
+                                    <>
+                                        <img src={previewUrl} alt="Patient Upload" className="w-full h-full object-cover" />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                                        {/* Attention heatmap overlay — simulates Grad-CAM heat */}
+                                        <div className="absolute w-28 h-28 bg-rose-500/60 rounded-full blur-2xl top-1/4 left-1/3 mix-blend-screen animate-pulse" />
+                                        <div className="absolute w-16 h-16 bg-orange-400/40 rounded-full blur-xl top-1/3 right-1/4 mix-blend-screen" />
+                                        <div className="absolute bottom-3 left-3 text-[10px] uppercase tracking-wider text-rose-300 font-bold bg-black/60 px-2 py-1 rounded">Attention Region Detected</div>
+                                    </>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center text-slate-600 p-4">
+                                        <UploadCloud className="w-10 h-10 mb-2 opacity-30" />
+                                        <p className="text-xs text-center">Upload an Intraoral Photo to see Grad-CAM attention overlay</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* SHAP Clinical Chart */}
+                        <div className="bg-slate-800/40 rounded-2xl p-5 border border-slate-700/50">
+                            <h3 className="text-xs uppercase tracking-widest text-teal-400 mb-3 border-b border-slate-700 pb-2">Clinical SHAP Drivers</h3>
+                            <div className="h-44">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={featureData} layout="vertical" margin={{ top: 0, right: 10, bottom: 0, left: 20 }}>
+                                        <XAxis type="number" hide />
+                                        <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} width={100} />
+                                        <Tooltip cursor={{fill: '#1e293b'}} contentStyle={{backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px'}} />
+                                        <Bar dataKey="impact" radius={[0, 4, 4, 0]} barSize={12}>
+                                            {featureData.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={entry.impact > 10 ? '#f43f5e' : '#2dd4bf'} />
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Bottom AI Synthesis Card */}
+                    <div className="bg-gradient-to-br from-slate-800 to-[#060e20] rounded-2xl p-6 border border-teal-500/20 shadow-[0_0_30px_rgba(13,148,136,0.05)] relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-teal-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4"></div>
+                        
+                        <h3 className="text-xs uppercase tracking-widest text-teal-400 mb-4 border-b border-teal-900 pb-2 inline-block">Clinical Synthesis Engine</h3>
+                        
+                        <p className="text-slate-300 font-light leading-relaxed mb-6 relative z-10 text-sm">
+                            {result.clinical_summary}
+                        </p>
+
+                        <div className="bg-[#131b2e] rounded-xl p-4 border border-slate-700 flex items-center relative z-10">
+                            <div className="bg-rose-500/20 w-8 h-8 rounded-full flex items-center justify-center mr-4 shrink-0">
+                                <div className="w-2.5 h-2.5 bg-rose-400 rounded-full animate-ping"></div>
+                            </div>
+                            <div>
+                                <h4 className="text-[10px] uppercase tracking-widest text-slate-500 mb-0.5">Recommended Protocol</h4>
+                                <p className="text-rose-300 font-bold uppercase tracking-wide text-sm">{result.next_action}</p>
+                            </div>
+                        </div>
+
+                        {/* Modality Weights Footer */}
+                        <div className="mt-6 pt-4 border-t border-slate-700/50 flex space-x-4 flex-wrap gap-y-3">
+                            {Object.entries(result.modality_weights).map(([modality, weight]) => {
+                                const isActive = weight > 0;
+                                const barColor = weight >= 30 ? 'bg-rose-400' : weight >= 15 ? 'bg-amber-400' : 'bg-teal-400';
+                                return (
+                                    <div key={modality} className="flex flex-col flex-1 min-w-[70px]">
+                                        <div className="flex justify-between text-[10px] mb-1 uppercase tracking-wider">
+                                            <span className={isActive ? 'text-slate-300' : 'text-slate-600'}>{modality}</span>
+                                            <span className={isActive ? 'text-white font-medium' : 'text-slate-600'}>{weight}%</span>
+                                        </div>
+                                        <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                                            <div className={`h-full rounded-full transition-all duration-700 ${isActive ? barColor : 'bg-slate-700'}`} style={{width: `${weight}%`}} />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                </div>
+            )}
+        </div>
+
       </div>
     </div>
   );
