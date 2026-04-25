@@ -5,6 +5,14 @@ pydantic
 pydantic-settings
 supabase
 python-dotenv
+numpy
+joblib
+scikit-learn
+lightgbm
+httpx
+sqlalchemy
+pillow
+pytest
 torch
 torchvision
 google-generativeai

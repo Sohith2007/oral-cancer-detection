@@ -1,88 +1,112 @@
-This is an ambitious and high-impact project, Dilip. Since you are using the GSD (Get Shit Done) system, this README is designed not just to look professional for GitHub, but to serve as a "Source of Truth" that GSD can use to understand your architecture and requirements.
+# Oral Cancer Detection
 
-Here is the finalized, professional README.md for your Oral Cancer Multimodal AI System.
+FastAPI + React prototype for multimodal oral-cancer risk assessment with:
 
-🧑‍⚕️ Oral Cancer Multimodal AI System
-Clinically Deployable Explainable AI (XAI) for Diagnosis & Risk Assessment
-📌 Project Overview
-The Oral Cancer Multimodal AI System is a next-generation healthcare platform designed to assist clinicians in the early detection and risk stratification of oral cancer. By integrating histopathology, clinical images, patient records, and genomic data, the system provides a holistic diagnostic view far beyond traditional single-modality analysis.
+- Supabase authentication
+- Tabular and image-informed prediction inputs
+- Ensemble model execution with deterministic fusion fallback
+- Gemini-powered clinical summaries with local fallback text
 
-The system emphasizes Explainable AI (XAI), ensuring that every prediction is backed by visual heatmaps and clinical factor breakdowns to build physician trust and improve patient outcomes.
+## Current Architecture
 
-🎯 Key Features
-Multimodal Fusion: Integrates four distinct data streams using attention-based transformers.
+### Frontend
 
-Triple-Layer Diagnosis: Categorical diagnosis (Cancer/Non-Cancer), Risk Level (Low/Med/High), and Confidence Scores.
+- Vite
+- React 19
+- React Router
+- Tailwind CSS v4 utilities
+- Supabase JS client
 
-Explainability (XAI): Generates Grad-CAM heatmaps for tumor localization and SHAP/LIME values for clinical feature importance.
+Main flow:
 
-Clinician Dashboard: A high-performance web interface for uploading patient data and visualizing diagnostic insights.
+1. User signs in through Supabase.
+2. Doctor dashboard fetches the backend schema.
+3. User uploads intra-oral and histopathology images plus clinical/genomic JSON.
+4. Frontend submits a multipart request to the FastAPI backend.
 
-Automated Reporting: One-click PDF clinical report generation for patient records.
+### Backend
 
-🧠 Core Architecture
-The system operates across three intelligent layers:
+- FastAPI
+- Supabase Python client for auth and prediction persistence
+- PyTorch / torchvision for model services
+- scikit-learn / LightGBM / joblib model loading
+- Optional Gemini summary generation
 
-Layer 1: Specialist Models
+Main API routes:
 
-Histopathology Branch: CNN/ViT for microscopic tissue analysis.
+- `GET /health`
+- `GET /api/v1/predict/schema`
+- `POST /api/v1/predict/`
+- `POST /api/v1/predict/multimodal`
 
-Intraoral Branch: Specialized computer vision for lesion photography.
+## Inference Notes
 
-Clinical Branch: Tabular encoders for EHR and patient history.
+- Base model artifacts are loaded from `backend/app/ml/models/`.
+- If a trained fusion checkpoint is missing, the backend uses a deterministic weighted-average fallback instead of a randomly initialized fusion network.
+- If trained vision checkpoints are missing, image branches return a neutral score of `0.5` instead of pretending to provide a medical prediction.
+- If `GEMINI_API_KEY` is not configured, the backend returns a local deterministic clinical summary.
 
-Genomic Branch: Deep learning for identifying high-risk gene expression patterns.
+These fallbacks keep the app operational while making missing trained assets explicit in system behavior.
 
-Layer 2: Fusion Intelligence
+## Environment Setup
 
-Attention-based mechanisms to weight the importance of each modality dynamically.
+### Backend
 
-Layer 3: Clinical Decision & XAI
+Copy `backend/.env.example` to `backend/.env` and fill in:
 
-Final classification, risk assessment, and generation of interpretable clinical evidence.
+- `SUPABASE_URL`
+- `SUPABASE_KEY`
+- `GEMINI_API_KEY` (optional)
+- `BACKEND_CORS_ORIGINS`
 
-🔥 Tech Stack
-🖥️ Frontend (Doctor Dashboard)
-Framework: React 19, Next.js (App Router)
+Install dependencies:
 
-Styling: Tailwind CSS, Shadcn UI
+```bash
+cd backend
+pip install -r requirements.txt
+```
 
-Language: TypeScript
+Run the API:
 
-Visualization: Recharts (for risk trends), Lucide React (icons)
+```bash
+uvicorn app.main:app --reload
+```
 
-⚙️ Backend (API & Logic)
-Framework: FastAPI (Python)
+### Frontend
 
-Task Queue: Celery/Redis (for heavy model inference)
+Copy `frontend/.env.example` to `frontend/.env` and fill in:
 
-PDF Logic: ReportLab or PyFPDF
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+- `VITE_API_URL`
 
-🧠 AI / Machine Learning
-Deep Learning: PyTorch
+Install and run:
 
-Computer Vision: OpenCV, Pillow, Torchvision
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-Data Science: Pandas, NumPy, Scikit-learn
+## Testing
 
-XAI: Captum (PyTorch Explainability), SHAP
+Backend:
 
-🗄️ Database
-Relational: PostgreSQL (Patient records, metadata)
+```bash
+cd backend
+pytest
+```
 
-Storage: AWS S3 or Local Vector Storage (for high-res medical images)
+Frontend:
 
-🚀 Getting Started
-Prerequisites
-Python 3.10+
+```bash
+cd frontend
+npm run lint
+npm run build
+```
 
-Node.js 18+
+## Repository Notes
 
-PostgreSQL  
-Step 1: /gsd-map-codebase to index architectural patterns.
-
-Step 2: /gsd-new-project to align on clinical requirements.
-
-Step 3: /gsd-plan-phase [n] for modular feature implementation.
-
-Step 4: /gsd-execute-phase [n] for automated coding and testing.
+- SQLAlchemy models are present in `backend/app/models`, but the active request path currently persists predictions through Supabase.
+- The admin page is intentionally lightweight and only reflects backend capabilities that exist in this repository.
+- Large model artifacts are already committed in the project; expect a heavier checkout than a typical web app.

@@ -15,7 +15,7 @@ app = FastAPI(
 # Restrict to your deployed frontend URL before going to production.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.BACKEND_CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -38,8 +38,8 @@ def health_check():
         "status": "healthy",
         "project": settings.PROJECT_NAME,
         "layers": {
-            "layer1_experts": "pending (Phase 3)",
-            "layer2_fusion": "pending (Phase 4)",
-            "layer3_xai": "pending (Phase 5)",
+            "layer1_experts": "available with checkpoint fallback",
+            "layer2_fusion": "available with deterministic fallback",
+            "layer3_xai": "available with local-summary fallback",
         },
     }

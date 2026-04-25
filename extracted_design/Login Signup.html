@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OralScan AI — Sign In</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: oklch(0.14 0.015 250);
+    --panel: oklch(0.18 0.012 248);
+    --card: oklch(0.21 0.01 248);
+    --border: oklch(0.28 0.012 248);
+    --teal: oklch(0.70 0.14 192);
+    --teal-dim: oklch(0.70 0.14 192 / 0.15);
+    --teal-glow: oklch(0.70 0.14 192 / 0.4);
+    --coral: oklch(0.68 0.14 28);
+    --text-primary: oklch(0.96 0.005 248);
+    --text-secondary: oklch(0.62 0.01 248);
+    --text-muted: oklch(0.42 0.01 248);
+    --error: oklch(0.65 0.18 22);
+    --success: oklch(0.68 0.14 155);
+  }
+
+  html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text-primary); overflow: hidden; }
+
+  #root { height: 100%; }
+
+  /* Orb */
+  .orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    pointer-events: none;
+    will-change: transform;
+  }
+  .orb-1 {
+    width: 420px; height: 420px;
+    background: radial-gradient(circle, oklch(0.70 0.14 192 / 0.35), transparent 70%);
+    top: -80px; left: -80px;
+    animation: drift1 12s ease-in-out infinite;
+  }
+  .orb-2 {
+    width: 300px; height: 300px;
+    background: radial-gradient(circle, oklch(0.68 0.14 28 / 0.25), transparent 70%);
+    bottom: -60px; right: -60px;
+    animation: drift2 15s ease-in-out infinite;
+  }
+  .orb-3 {
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, oklch(0.70 0.14 192 / 0.18), transparent 70%);
+    bottom: 30%; left: 20%;
+    animation: drift3 18s ease-in-out infinite;
+  }
+  @keyframes drift1 { 0%,100%{transform:translate(0,0)} 33%{transform:translate(30px,40px)} 66%{transform:translate(-20px,20px)} }
+  @keyframes drift2 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-30px,-30px)} }
+  @keyframes drift3 { 0%,100%{transform:translate(0,0)} 40%{transform:translate(20px,-30px)} 80%{transform:translate(-10px,20px)} }
+
+  /* Grid texture */
+  .grid-bg {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(oklch(0.35 0.01 248 / 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, oklch(0.35 0.01 248 / 0.08) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+  }
+
+  .page { display: flex; height: 100vh; width: 100%; }
+
+  /* ─── Brand Panel ─── */
+  .brand-panel {
+    flex: 0 0 44%;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 40px 48px;
+    border-right: 1px solid var(--border);
+  }
+
+  .logo-mark {
+    display: flex; align-items: center; gap: 10px;
+    position: relative; z-index: 2;
+  }
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: var(--teal);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--bg);
+    letter-spacing: -0.5px;
+    flex-shrink: 0;
+  }
+  .logo-text { font-family: 'Sora', sans-serif; font-size: 15px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.3px; }
+  .logo-sub  { font-size: 10px; font-weight: 300; color: var(--text-secondary); letter-spacing: 1.5px; text-transform: uppercase; margin-top: 1px; }
+
+  .brand-center { position: relative; z-index: 2; }
+
+  .brand-headline {
+    font-family: 'Sora', sans-serif;
+    font-size: clamp(28px, 3.2vw, 42px);
+    font-weight: 700;
+    line-height: 1.18;
+    letter-spacing: -1px;
+    color: var(--text-primary);
+    margin-bottom: 18px;
+  }
+  .brand-headline em { font-style: normal; color: var(--teal); }
+
+  .brand-desc {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    max-width: 340px;
+    font-weight: 300;
+  }
+
+  .stats-row {
+    display: flex; gap: 32px;
+    margin-top: 40px;
+  }
+  .stat { display: flex; flex-direction: column; gap: 3px; }
+  .stat-val { font-family: 'Sora', sans-serif; font-size: 22px; font-weight: 700; color: var(--teal); letter-spacing: -0.5px; }
+  .stat-label { font-size: 11px; color: var(--text-muted); letter-spacing: 0.5px; text-transform: uppercase; }
+
+  .brand-footer { position: relative; z-index: 2; }
+  .trust-badges { display: flex; gap: 8px; flex-wrap: wrap; }
+  .badge {
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 10px;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  /* Scan animation */
+  .scan-illustration {
+    margin: 32px 0;
+    position: relative;
+    z-index: 2;
+  }
+  .scan-box {
+    width: 180px; height: 180px;
+    border: 2px solid var(--teal-dim);
+    border-radius: 24px;
+    position: relative;
+    overflow: hidden;
+    background: oklch(0.16 0.012 248);
+  }
+  .scan-inner { padding: 16px; }
+  .scan-label { font-size: 9px; text-transform: uppercase; letter-spacing: 2px; color: var(--teal); margin-bottom: 10px; }
+  .scan-line {
+    width: 100%; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--teal), transparent);
+    position: absolute; left: 0;
+    animation: scanMove 2.4s ease-in-out infinite;
+    box-shadow: 0 0 12px var(--teal-glow);
+  }
+  @keyframes scanMove { 0%{top:16px; opacity:0} 10%{opacity:1} 90%{opacity:1} 100%{top:160px; opacity:0} }
+
+  .scan-dots {
+    display: grid; grid-template-columns: repeat(5,1fr); gap: 6px;
+    margin-top: 8px;
+  }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--border);
+    animation: dotPulse 2.4s ease-in-out infinite;
+  }
+  .dot.active { background: var(--teal); box-shadow: 0 0 6px var(--teal-glow); }
+  @keyframes dotPulse { 0%,100%{opacity:0.3} 50%{opacity:1} }
+
+  .confidence-bar { margin-top: 18px; }
+  .conf-label { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 10px; color: var(--text-muted); }
+  .conf-track { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .conf-fill { height: 100%; background: linear-gradient(90deg, var(--teal), oklch(0.70 0.14 155)); border-radius: 2px; animation: confGrow 3s ease-out infinite; }
+  @keyframes confGrow { 0%{width:0} 60%{width:94%} 100%{width:94%} }
+
+  /* ─── Form Panel ─── */
+  .form-panel {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    overflow-y: auto;
+    position: relative;
+  }
+
+  .form-container {
+    width: 100%;
+    max-width: 400px;
+  }
+
+  /* Toggle tabs */
+  .auth-tabs {
+    display: flex;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 32px;
+    position: relative;
+  }
+  .tab-btn {
+    flex: 1;
+    padding: 9px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    border-radius: 9px;
+    transition: color 0.2s;
+    position: relative; z-index: 1;
+    letter-spacing: 0.2px;
+  }
+  .tab-btn.active { color: var(--text-primary); }
+  .tab-slider {
+    position: absolute;
+    top: 4px; bottom: 4px;
+    width: calc(50% - 4px);
+    background: var(--panel);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    transition: left 0.28s cubic-bezier(0.34,1.56,0.64,1);
+    box-shadow: 0 2px 8px oklch(0 0 0 / 0.3);
+  }
+  .tab-slider.login { left: 4px; }
+  .tab-slider.signup { left: calc(50%); }
+
+  /* Form header */
+  .form-title {
+    font-family: 'Sora', sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+  }
+  .form-subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 28px;
+    line-height: 1.5;
+  }
+
+  /* Fields */
+  .field-row { display: flex; gap: 12px; }
+  .field-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; flex: 1; }
+  .field-label { font-size: 12px; font-weight: 500; color: var(--text-secondary); letter-spacing: 0.3px; }
+
+  .field-wrap { position: relative; }
+  .field-icon {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+    display: flex; align-items: center;
+  }
+  .field-input {
+    width: 100%;
+    padding: 11px 14px 11px 38px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius, 10px);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    -webkit-appearance: none;
+  }
+  .field-input::placeholder { color: var(--text-muted); }
+  .field-input:focus {
+    border-color: var(--teal);
+    box-shadow: 0 0 0 3px var(--teal-dim);
+  }
+  .field-input.error {
+    border-color: var(--error);
+    box-shadow: 0 0 0 3px oklch(0.65 0.18 22 / 0.12);
+  }
+
+  .eye-btn {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; cursor: pointer;
+    color: var(--text-muted); display: flex; align-items: center;
+    padding: 4px;
+    transition: color 0.2s;
+  }
+  .eye-btn:hover { color: var(--text-secondary); }
+
+  .field-error { font-size: 11px; color: var(--error); margin-top: -4px; }
+
+  /* Select */
+  .field-select {
+    width: 100%;
+    padding: 11px 14px 11px 38px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius, 10px);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    color: var(--text-primary);
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    -webkit-appearance: none;
+  }
+  .field-select:focus { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-dim); }
+  .field-select option { background: var(--card); }
+
+  /* Password strength */
+  .pw-strength { margin-top: 6px; }
+  .pw-bars { display: flex; gap: 3px; }
+  .pw-bar { flex: 1; height: 3px; border-radius: 2px; background: var(--border); transition: background 0.3s; }
+  .pw-text { font-size: 10px; margin-top: 4px; }
+
+  /* Checkbox */
+  .check-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 20px; }
+  .check-box {
+    width: 16px; height: 16px;
+    border: 1.5px solid var(--border);
+    border-radius: 4px;
+    background: var(--card);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+    transition: all 0.15s;
+  }
+  .check-box.checked { background: var(--teal); border-color: var(--teal); }
+  .check-label { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+  .check-label a { color: var(--teal); text-decoration: none; }
+  .check-label a:hover { text-decoration: underline; }
+
+  /* Forgot */
+  .forgot-row { display: flex; justify-content: flex-end; margin-top: -8px; margin-bottom: 20px; }
+  .forgot-link { font-size: 12px; color: var(--teal); text-decoration: none; }
+  .forgot-link:hover { text-decoration: underline; }
+
+  /* Submit */
+  .submit-btn {
+    width: 100%;
+    padding: 13px;
+    background: var(--teal);
+    color: var(--bg);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    border-radius: var(--radius, 10px);
+    cursor: pointer;
+    letter-spacing: 0.3px;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .submit-btn:hover { background: oklch(0.74 0.14 192); transform: translateY(-1px); box-shadow: 0 8px 20px var(--teal-glow); }
+  .submit-btn:active { transform: translateY(0); }
+  .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+  .submit-btn.loading::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent 0%, oklch(1 0 0 / 0.15) 50%, transparent 100%);
+    animation: shimmer 1.2s infinite;
+  }
+  @keyframes shimmer { from{transform:translateX(-100%)} to{transform:translateX(100%)} }
+
+  /* Divider */
+  .divider { display: flex; align-items: center; gap: 12px; margin: 20px 0; }
+  .divider-line { flex: 1; height: 1px; background: var(--border); }
+  .divider-text { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+
+  /* OAuth */
+  .oauth-btn {
+    width: 100%;
+    padding: 11px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius, 10px);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: all 0.2s;
+    margin-bottom: 8px;
+  }
+  .oauth-btn:hover { border-color: var(--text-muted); color: var(--text-primary); background: oklch(0.23 0.01 248); }
+
+  /* Success */
+  .success-screen {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 40px;
+    animation: fadeIn 0.4s ease;
+  }
+  .success-icon {
+    width: 64px; height: 64px;
+    background: oklch(0.68 0.14 155 / 0.15);
+    border: 2px solid var(--success);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 20px;
+    animation: popIn 0.5s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes popIn { from{transform:scale(0)} to{transform:scale(1)} }
+  .success-title { font-family: 'Sora',sans-serif; font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+  .success-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+
+  @keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+  /* Form slide transitions */
+  .form-slide {
+    animation: slideIn 0.32s cubic-bezier(0.22,1,0.36,1);
+  }
+  @keyframes slideIn { from{opacity:0;transform:translateX(18px)} to{opacity:1;transform:translateX(0)} }
+
+  @media (max-width: 768px) {
+    .brand-panel { display: none; }
+    .form-panel { padding: 24px; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef, useEffect } = React;
+
+/* ── Icons ── */
+const Icon = ({ d, size=16, stroke=1.7 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round">
+    {d.map((p, i) => typeof p === 'string' && p.startsWith('<') ? null :
+      <path key={i} d={p} />
+    )}
+  </svg>
+);
+
+const MailIcon   = () => <Icon size={15} d={["M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z","M22 6l-10 7L2 6"]} />;
+const LockIcon   = () => <Icon size={15} d={["M19 11H5a2 2 0 00-2 2v7a2 2 0 002 2h14a2 2 0 002-2v-7a2 2 0 00-2-2z","M7 11V7a5 5 0 0110 0v4"]} />;
+const UserIcon   = () => <Icon size={15} d={["M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2","M12 3a4 4 0 100 8 4 4 0 000-8z"]} />;
+const EyeIcon    = () => <Icon size={15} d={["M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z","M12 9a3 3 0 100 6 3 3 0 000-6z"]} />;
+const EyeOffIcon = () => <Icon size={15} d={["M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24","M1 1l22 22"]} />;
+const BriefcaseIcon = () => <Icon size={15} d={["M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z","M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"]} />;
+const CheckIcon  = ({ size=22 }) => <Icon size={size} stroke={2.5} d={["M20 6L9 17l-5-5"]} />;
+const GoogleIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24">
+    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+  </svg>
+);
+
+/* ── Password Strength ── */
+function getStrength(pw) {
+  let score = 0;
+  if (pw.length >= 8)  score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  return score;
+}
+const strengthMap = [
+  { label: '', color: 'var(--border)' },
+  { label: 'Weak', color: 'var(--error)' },
+  { label: 'Fair', color: 'var(--coral)' },
+  { label: 'Good', color: 'oklch(0.70 0.14 80)' },
+  { label: 'Strong', color: 'var(--success)' },
+];
+
+function PasswordStrength({ password }) {
+  const s = getStrength(password);
+  const info = strengthMap[s];
+  return (
+    <div className="pw-strength">
+      <div className="pw-bars">
+        {[1,2,3,4].map(i => (
+          <div key={i} className="pw-bar" style={{ background: i <= s ? info.color : 'var(--border)' }} />
+        ))}
+      </div>
+      {password && (
+        <div className="pw-text" style={{ color: info.color }}>{info.label}</div>
+      )}
+    </div>
+  );
+}
+
+/* ── Scan Illustration ── */
+function ScanIllustration() {
+  const [activeDot, setActiveDot] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setActiveDot(d => (d+1)%15), 200);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <div className="scan-illustration">
+      <div className="scan-box">
+        <div className="scan-inner">
+          <div className="scan-label">AI Analysis</div>
+          <div className="scan-dots">
+            {Array.from({length:15}).map((_,i) => (
+              <div key={i} className={`dot ${i === activeDot || i === (activeDot+3)%15 || i === (activeDot+7)%15 ? 'active' : ''}`} />
+            ))}
+          </div>
+          <div className="confidence-bar" style={{marginTop:14}}>
+            <div className="conf-label"><span>Confidence</span><span style={{color:'var(--teal)'}}>94.2%</span></div>
+            <div className="conf-track"><div className="conf-fill" /></div>
+          </div>
+          <div className="confidence-bar" style={{marginTop:8}}>
+            <div className="conf-label"><span>Risk Score</span><span style={{color:'var(--success)'}}>Low</span></div>
+            <div className="conf-track"><div className="conf-fill" style={{background:'var(--success)', animationDelay:'.4s', width:'18%'}} /></div>
+          </div>
+        </div>
+        <div className="scan-line" />
+      </div>
+    </div>
+  );
+}
+
+/* ── Login Form ── */
+function LoginForm({ onSuccess }) {
+  const [email, setEmail]     = useState('');
+  const [password, setPassword] = useState('');
+  const [showPw, setShowPw]   = useState(false);
+  const [errors, setErrors]   = useState({});
+  const [loading, setLoading] = useState(false);
+
+  function validate() {
+    const e = {};
+    if (!email) e.email = 'Email is required';
+    else if (!/\S+@\S+\.\S+/.test(email)) e.email = 'Enter a valid email';
+    if (!password) e.password = 'Password is required';
+    else if (password.length < 6) e.password = 'At least 6 characters';
+    return e;
+  }
+
+  async function handleSubmit(ev) {
+    ev.preventDefault();
+    const e = validate();
+    if (Object.keys(e).length) { setErrors(e); return; }
+    setErrors({});
+    setLoading(true);
+    await new Promise(r => setTimeout(r, 1600));
+    setLoading(false);
+    onSuccess('login');
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="form-slide" noValidate>
+      <div className="form-title">Welcome back</div>
+      <div className="form-subtitle">Sign in to your OralScan AI account</div>
+
+      <div className="field-group">
+        <label className="field-label">Email address</label>
+        <div className="field-wrap">
+          <span className="field-icon"><MailIcon /></span>
+          <input className={`field-input ${errors.email ? 'error' : ''}`} type="email" placeholder="you@hospital.org"
+            value={email} onChange={e => { setEmail(e.target.value); setErrors(p => ({...p, email:''})); }} />
+        </div>
+        {errors.email && <span className="field-error">{errors.email}</span>}
+      </div>
+
+      <div className="field-group">
+        <label className="field-label">Password</label>
+        <div className="field-wrap">
+          <span className="field-icon"><LockIcon /></span>
+          <input className={`field-input ${errors.password ? 'error' : ''}`}
+            type={showPw ? 'text' : 'password'} placeholder="••••••••"
+            style={{paddingRight:38}}
+            value={password} onChange={e => { setPassword(e.target.value); setErrors(p => ({...p, password:''})); }} />
+          <button type="button" className="eye-btn" onClick={() => setShowPw(v => !v)}>
+            {showPw ? <EyeOffIcon /> : <EyeIcon />}
+          </button>
+        </div>
+        {errors.password && <span className="field-error">{errors.password}</span>}
+      </div>
+
+      <div className="forgot-row">
+        <a href="#" className="forgot-link">Forgot password?</a>
+      </div>
+
+      <button type="submit" className={`submit-btn ${loading ? 'loading' : ''}`} disabled={loading}>
+        {loading ? 'Signing in…' : 'Sign In'}
+      </button>
+
+    </form>
+  );
+}
+
+/* ── Signup Form ── */
+function SignupForm({ onSuccess }) {
+  const [form, setForm]       = useState({ firstName:'', lastName:'', email:'', role:'', password:'', confirm:'' });
+  const [showPw, setShowPw]   = useState(false);
+  const [agree, setAgree]     = useState(false);
+  const [errors, setErrors]   = useState({});
+  const [loading, setLoading] = useState(false);
+
+  const set = (k) => (e) => { setForm(p => ({...p, [k]: e.target.value})); setErrors(p => ({...p, [k]:''})); };
+
+  function validate() {
+    const e = {};
+    if (!form.firstName.trim()) e.firstName = 'Required';
+    if (!form.lastName.trim())  e.lastName  = 'Required';
+    if (!form.email) e.email = 'Email is required';
+    else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Enter a valid email';
+    if (!form.role) e.role = 'Select your role';
+    if (!form.password) e.password = 'Password is required';
+    else if (form.password.length < 8) e.password = 'Minimum 8 characters';
+    if (form.confirm !== form.password) e.confirm = 'Passwords do not match';
+    if (!agree) e.agree = 'Please accept the terms';
+    return e;
+  }
+
+  async function handleSubmit(ev) {
+    ev.preventDefault();
+    const e = validate();
+    if (Object.keys(e).length) { setErrors(e); return; }
+    setErrors({});
+    setLoading(true);
+    await new Promise(r => setTimeout(r, 1800));
+    setLoading(false);
+    onSuccess('signup');
+  }
+
+  const roles = [
+    'Select your role',
+    'Patient',
+    'Oral & Maxillofacial Surgeon',
+    'Dentist / General Practitioner',
+    'Oncologist',
+    'Radiologist',
+    'Medical Researcher',
+    'Nurse / Allied Health',
+    'Hospital Administrator',
+  ];
+
+  return (
+    <form onSubmit={handleSubmit} className="form-slide" noValidate>
+      <div className="form-title">Create account</div>
+      <div className="form-subtitle">Join the OralScan AI diagnostic platform</div>
+
+      <div className="field-row">
+        <div className="field-group">
+          <label className="field-label">First name</label>
+          <div className="field-wrap">
+            <span className="field-icon"><UserIcon /></span>
+            <input className={`field-input ${errors.firstName ? 'error' : ''}`} type="text" placeholder="Jane"
+              value={form.firstName} onChange={set('firstName')} />
+          </div>
+          {errors.firstName && <span className="field-error">{errors.firstName}</span>}
+        </div>
+        <div className="field-group">
+          <label className="field-label">Last name</label>
+          <div className="field-wrap">
+            <span className="field-icon" style={{opacity:0}}><UserIcon /></span>
+            <input className={`field-input ${errors.lastName ? 'error' : ''}`} type="text" placeholder="Smith"
+              style={{paddingLeft:14}}
+              value={form.lastName} onChange={set('lastName')} />
+          </div>
+          {errors.lastName && <span className="field-error">{errors.lastName}</span>}
+        </div>
+      </div>
+
+      <div className="field-group">
+        <label className="field-label">{form.role === 'Patient' ? 'Email address' : 'Work email'}</label>
+        <div className="field-wrap">
+          <span className="field-icon"><MailIcon /></span>
+          <input className={`field-input ${errors.email ? 'error' : ''}`} type="email"
+            placeholder={form.role === 'Patient' ? 'you@example.com' : 'you@hospital.org'}
+            value={form.email} onChange={set('email')} />
+        </div>
+        {errors.email && <span className="field-error">{errors.email}</span>}
+      </div>
+
+      <div className="field-group">
+        <label className="field-label">Clinical role</label>
+        <div className="field-wrap">
+          <span className="field-icon"><BriefcaseIcon /></span>
+          <select className={`field-select ${errors.role ? 'error' : ''}`} value={form.role} onChange={set('role')}>
+            {roles.map(r => <option key={r} value={r === roles[0] ? '' : r}>{r}</option>)}
+          </select>
+        </div>
+        {errors.role && <span className="field-error">{errors.role}</span>}
+      </div>
+
+      <div className="field-group">
+        <label className="field-label">Password</label>
+        <div className="field-wrap">
+          <span className="field-icon"><LockIcon /></span>
+          <input className={`field-input ${errors.password ? 'error' : ''}`}
+            type={showPw ? 'text' : 'password'} placeholder="Min. 8 characters"
+            style={{paddingRight:38}}
+            value={form.password} onChange={set('password')} />
+          <button type="button" className="eye-btn" onClick={() => setShowPw(v => !v)}>
+            {showPw ? <EyeOffIcon /> : <EyeIcon />}
+          </button>
+        </div>
+        {errors.password && <span className="field-error">{errors.password}</span>}
+        {form.password && <PasswordStrength password={form.password} />}
+      </div>
+
+      <div className="field-group">
+        <label className="field-label">Confirm password</label>
+        <div className="field-wrap">
+          <span className="field-icon"><LockIcon /></span>
+          <input className={`field-input ${errors.confirm ? 'error' : ''}`}
+            type={showPw ? 'text' : 'password'} placeholder="Re-enter password"
+            value={form.confirm} onChange={set('confirm')} />
+        </div>
+        {errors.confirm && <span className="field-error">{errors.confirm}</span>}
+      </div>
+
+      <div className="check-row" style={{cursor:'pointer'}} onClick={() => setAgree(v => !v)}>
+        <div className={`check-box ${agree ? 'checked' : ''}`}>
+          {agree && <CheckIcon size={10} />}
+        </div>
+        <span className="check-label">
+          I agree to OralScan AI's <a href="#" onClick={e=>e.stopPropagation()}>Terms of Service</a> and <a href="#" onClick={e=>e.stopPropagation()}>Privacy Policy</a>. Patient data is handled in compliance with HIPAA.
+        </span>
+      </div>
+      {errors.agree && <div className="field-error" style={{marginTop:-8,marginBottom:12}}>{errors.agree}</div>}
+
+      <button type="submit" className={`submit-btn ${loading ? 'loading' : ''}`} disabled={loading}>
+        {loading ? 'Creating account…' : 'Create Account'}
+      </button>
+
+    </form>
+  );
+}
+
+/* ── Success Screen ── */
+function SuccessScreen({ mode, onBack }) {
+  return (
+    <div className="success-screen">
+      <div className="success-icon">
+        <CheckIcon size={26} />
+      </div>
+      <div className="success-title" style={{color:'var(--success)'}}>
+        {mode === 'login' ? 'Signed in!' : 'Account created!'}
+      </div>
+      <div className="success-desc" style={{maxWidth:280}}>
+        {mode === 'login'
+          ? 'Welcome back. Redirecting you to your diagnostic dashboard…'
+          : 'Your account is ready. Please check your work email to verify before logging in.'}
+      </div>
+      <button onClick={onBack} style={{marginTop:28,background:'none',border:'1px solid var(--border)',borderRadius:8,padding:'9px 20px',color:'var(--text-secondary)',cursor:'pointer',fontSize:13,fontFamily:'inherit'}}>
+        ← Back to sign in
+      </button>
+    </div>
+  );
+}
+
+/* ── App ── */
+function App() {
+  const [tab, setTab]         = useState('login');
+  const [success, setSuccess] = useState(null);
+  const [key, setKey]         = useState(0);
+
+  const [tweaks, setTweak] = useTweaks(/*EDITMODE-BEGIN*/{
+    "accentColor": "#22d3c8",
+    "showBrandPanel": true,
+    "showStats": true,
+    "formWidth": 400,
+    "roundness": 10
+  }/*EDITMODE-END*/);
+
+  const cssVars = {
+    '--teal': tweaks.accentColor,
+    '--teal-dim': tweaks.accentColor + '26',
+    '--teal-glow': tweaks.accentColor + '66',
+    '--radius': tweaks.roundness + 'px',
+  };
+
+  function switchTab(t) {
+    setTab(t);
+    setSuccess(null);
+    setKey(k => k+1);
+  }
+
+  return (
+    <div className="page" style={cssVars}>
+      {/* Brand Panel */}
+      {tweaks.showBrandPanel && <div className="brand-panel">
+        <div className="grid-bg" />
+        <div className="orb orb-1" />
+        <div className="orb orb-2" />
+        <div className="orb orb-3" />
+
+        <div className="logo-mark">
+          <div className="logo-icon">OS</div>
+          <div>
+            <div className="logo-text">OralScan AI</div>
+            <div className="logo-sub">Diagnostic Platform</div>
+          </div>
+        </div>
+
+        <div className="brand-center">
+          <div className="brand-headline">
+            Detect <em>early.</em><br />Treat <em>faster.</em><br />Save lives.
+          </div>
+          <div className="brand-desc">
+            AI-powered oral cancer detection that gives clinicians confidence. Trained on 2M+ histopathology images with 94.2% diagnostic accuracy.
+          </div>
+          <ScanIllustration />
+          {tweaks.showStats && <div className="stats-row">
+            <div className="stat"><div className="stat-val">94.2%</div><div className="stat-label">Accuracy</div></div>
+            <div className="stat"><div className="stat-val">2M+</div><div className="stat-label">Images</div></div>
+            <div className="stat"><div className="stat-val">340ms</div><div className="stat-label">Per scan</div></div>
+          </div>}
+        </div>
+
+        <div className="brand-footer">
+          <div className="trust-badges">
+            <div className="badge">HIPAA</div>
+            <div className="badge">CE Mark</div>
+            <div className="badge">FDA 510(k)</div>
+            <div className="badge">ISO 13485</div>
+          </div>
+        </div>
+      </div>}
+
+      {/* Form Panel */}
+      <div className="form-panel">
+        <div className="form-container" style={{maxWidth: tweaks.formWidth + 'px'}}>
+          {success ? (
+            <SuccessScreen mode={success} onBack={() => { setSuccess(null); setKey(k=>k+1); }} />
+          ) : (
+            <>
+              <div className="auth-tabs">
+                <div className={`tab-slider ${tab}`} />
+                <button className={`tab-btn ${tab === 'login' ? 'active' : ''}`} onClick={() => switchTab('login')}>Sign In</button>
+                <button className={`tab-btn ${tab === 'signup' ? 'active' : ''}`} onClick={() => switchTab('signup')}>Create Account</button>
+              </div>
+              {tab === 'login'
+                ? <LoginForm  key={`login-${key}`}  onSuccess={setSuccess} />
+                : <SignupForm key={`signup-${key}`} onSuccess={setSuccess} />
+              }
+            </>
+          )}
+        </div>
+      </div>
+      <TweaksPanel title="Tweaks">
+        <TweakSection label="Brand">
+          <TweakColor    id="accentColor"   title="Accent color"    value={tweaks.accentColor}   onChange={v => setTweak('accentColor', v)} />
+          <TweakToggle   id="showBrandPanel" title="Brand panel"     value={tweaks.showBrandPanel} onChange={v => setTweak('showBrandPanel', v)} />
+          <TweakToggle   id="showStats"     title="Stats row"       value={tweaks.showStats}      onChange={v => setTweak('showStats', v)} />
+        </TweakSection>
+        <TweakSection label="Form">
+          <TweakSlider   id="formWidth"     title="Form width"      value={tweaks.formWidth}      onChange={v => setTweak('formWidth', v)}   min={300} max={560} step={10} />
+          <TweakSlider   id="roundness"     title="Corner radius"   value={tweaks.roundness}      onChange={v => setTweak('roundness', v)}   min={0}   max={24}  step={1} />
+        </TweakSection>
+      </TweaksPanel>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

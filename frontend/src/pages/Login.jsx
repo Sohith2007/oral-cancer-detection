@@ -1,85 +1,74 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Stethoscope, ShieldCheck } from 'lucide-react';
+import { useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import AuthPage from '../components/AuthPage'
+import { isDemoAuthMode, signIn, supabaseConfigError } from '../supabaseClient'
 
-const Login = () => {
-  const navigate = useNavigate();
-  const [role, setRole] = useState('doctor');
+export default function Login() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [email, setEmail] = useState('demo@doctor.com')
+  const [password, setPassword] = useState('password')
+  const [showPassword, setShowPassword] = useState(false)
+  const [agree, setAgree] = useState(true)
+  const [errors, setErrors] = useState({})
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  const handleLogin = (e) => {
-    e.preventDefault();
-    if (role === 'doctor') {
-      navigate('/doctor/dashboard');
-    } else {
-      navigate('/admin/dashboard');
+  const handleSubmit = async (event) => {
+    event.preventDefault()
+    const nextErrors = {}
+    setError('')
+
+    if (!email) nextErrors.email = 'Email is required'
+    if (!password) nextErrors.password = 'Password is required'
+    if (Object.keys(nextErrors).length) {
+      setErrors(nextErrors)
+      return
     }
-  };
+
+    setErrors({})
+    setLoading(true)
+    try {
+      const { error: authError } = await signIn({ email, password })
+      if (authError) {
+        setError(authError.message)
+        return
+      }
+      navigate('/doctor/dashboard', { replace: true })
+    } catch (loginError) {
+      setError(loginError.message || 'Unexpected login error. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-medicalSecondary p-4">
-      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-medicalSecondary">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-medicalPrimary mb-2">OralDetect AI</h1>
-          <p className="text-slate-500">Clinical Decision Support System</p>
-        </div>
-
-        <form onSubmit={handleLogin} className="space-y-6">
-          <div className="flex justify-center space-x-4 mb-6">
-            <button
-              type="button"
-              onClick={() => setRole('doctor')}
-              className={`flex-1 py-3 px-4 rounded-xl flex items-center justify-center space-x-2 transition-all ${
-                role === 'doctor'
-                  ? 'bg-medicalPrimary text-white shadow-md'
-                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-              }`}
-            >
-              <Stethoscope size={20} />
-              <span>Doctor</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setRole('admin')}
-              className={`flex-1 py-3 px-4 rounded-xl flex items-center justify-center space-x-2 transition-all ${
-                role === 'admin'
-                  ? 'bg-medicalPrimary text-white shadow-md'
-                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-              }`}
-            >
-              <ShieldCheck size={20} />
-              <span>Admin</span>
-            </button>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-            <input
-              type="email"
-              className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-medicalPrimary focus:border-transparent transition-all outline-none"
-              placeholder={`demo@${role}.com`}
-              defaultValue={`demo@${role}.com`}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
-            <input
-              type="password"
-              className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-medicalPrimary focus:border-transparent transition-all outline-none"
-              placeholder="••••••••"
-              defaultValue="password"
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="w-full bg-medicalPrimary hover:bg-blue-600 text-white font-semibold py-3 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5"
-          >
-            Sign In
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-export default Login;
+    <AuthPage
+      mode="login"
+      title="Welcome back"
+      subtitle="Sign in to your OralScan AI account"
+      successMessage={location.state?.signupSuccess || ''}
+      warningMessage={isDemoAuthMode ? `${supabaseConfigError} Use demo@doctor.com / password.` : ''}
+      onModeChange={(mode) => navigate(mode === 'login' ? '/login' : '/signup')}
+      onSubmit={handleSubmit}
+      submitLabel="Continue to Workspace"
+      loadingLabel="Opening workspace..."
+      bottomPrompt="Need a new account?"
+      bottomAction="Create one"
+      onBottomAction={() => navigate('/signup')}
+      state={{
+        email,
+        setEmail,
+        password,
+        setPassword,
+        showPassword,
+        setShowPassword,
+        agree,
+        setAgree,
+        loading,
+        error,
+        errors,
+      }}
+    />
+  )
+}
