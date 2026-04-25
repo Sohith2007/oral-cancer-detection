@@ -42,17 +42,18 @@ class VisionExpertService(nn.Module):
         self.model = backbone
 
     def forward(self, image_bytes):
+        if not image_bytes:
+            return 0.5
+        if self.model is None:
+            raise FileNotFoundError(f"Missing vision checkpoint: {self.checkpoint_path}")
         try:
-            if not image_bytes or self.model is None:
-                # Return a neutral probability rather than a fabricated medical score
-                # when no trained checkpoint is available.
-                return 0.5
-
             image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
             tensor = self.transform(image).unsqueeze(0)
             with torch.no_grad():
                 probability = self.model(tensor)
             return probability.item()
+        except FileNotFoundError:
+            raise
         except Exception as exc:
             print(f"[Vision Error] Failed to process image: {exc}")
             return 0.5

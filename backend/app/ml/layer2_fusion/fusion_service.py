@@ -174,7 +174,7 @@ class SimultaneousEnsemblePipeline:
 
         for idx, name in enumerate(discovered_names):
             lowered = name.lower()
-            if idx < 5 or any(keyword in lowered for keyword in clinical_keywords):
+            if any(keyword in lowered for keyword in clinical_keywords):
                 clinical_features.append(name)
             else:
                 gene_features.append(name)
@@ -259,14 +259,33 @@ class SimultaneousEnsemblePipeline:
 
         return features.tolist()
         
-    def _predict_single_model(self, model, X):
-        if hasattr(model, 'n_features_in_') and X.shape[1] > model.n_features_in_:
-            X_model = X[:, :model.n_features_in_]
-        elif hasattr(model, 'feature_name_') and X.shape[1] > len(model.feature_name_):
-             X_model = X[:, :len(model.feature_name_)]
-        else:
-            X_model = X
-            
+    def _predict_single_model(self, model, X_raw):
+        X_model = X_raw
+        if hasattr(model, 'n_features_in_'):
+            expected = model.n_features_in_
+            if X_raw.shape[1] == expected:
+                X_model = X_raw
+            elif self.feature_selector is not None and getattr(self.feature_selector, 'n_features_in_', -1) == X_raw.shape[1]:
+                X_sel = self.feature_selector.transform(X_raw)
+                if X_sel.shape[1] == expected:
+                    X_model = X_sel
+                else:
+                    X_model = X_raw[:, :expected]
+            else:
+                X_model = X_raw[:, :expected]
+        elif hasattr(model, 'feature_name_'):
+            expected = len(model.feature_name_)
+            if X_raw.shape[1] == expected:
+                X_model = X_raw
+            elif self.feature_selector is not None and getattr(self.feature_selector, 'n_features_in_', -1) == X_raw.shape[1]:
+                X_sel = self.feature_selector.transform(X_raw)
+                if X_sel.shape[1] == expected:
+                    X_model = X_sel
+                else:
+                    X_model = X_raw[:, :expected]
+            else:
+                X_model = X_raw[:, :expected]
+                
         if hasattr(model, "predict_proba"):
             return model.predict_proba(X_model)[:, 1]
         elif hasattr(model, "predict"):
@@ -281,13 +300,25 @@ class SimultaneousEnsemblePipeline:
             if hasattr(model, "feature_importances_"):
                 importances = model.feature_importances_
                 
-                # Check feature count
-                if hasattr(model, 'n_features_in_') and X_sample.shape[1] > model.n_features_in_:
-                    x_adj = X_sample[:, :model.n_features_in_]
-                elif hasattr(model, 'feature_name_') and X_sample.shape[1] > len(model.feature_name_):
-                     x_adj = X_sample[:, :len(model.feature_name_)]
-                else:
-                    x_adj = X_sample
+                x_adj = X_sample
+                if hasattr(model, 'n_features_in_'):
+                    expected = model.n_features_in_
+                    if X_sample.shape[1] == expected:
+                        x_adj = X_sample
+                    elif self.feature_selector is not None and getattr(self.feature_selector, 'n_features_in_', -1) == X_sample.shape[1]:
+                        X_sel = self.feature_selector.transform(X_sample)
+                        x_adj = X_sel if X_sel.shape[1] == expected else X_sample[:, :expected]
+                    else:
+                        x_adj = X_sample[:, :expected]
+                elif hasattr(model, 'feature_name_'):
+                    expected = len(model.feature_name_)
+                    if X_sample.shape[1] == expected:
+                        x_adj = X_sample
+                    elif self.feature_selector is not None and getattr(self.feature_selector, 'n_features_in_', -1) == X_sample.shape[1]:
+                        X_sel = self.feature_selector.transform(X_sample)
+                        x_adj = X_sel if X_sel.shape[1] == expected else X_sample[:, :expected]
+                    else:
+                        x_adj = X_sample[:, :expected]
                     
                 # Naive Local Importance: Global Importance * Local Feature Value
                 local_contributions = importances * x_adj[0]
@@ -321,19 +352,14 @@ class SimultaneousEnsemblePipeline:
             if len(X_raw.shape) == 1:
                 X_raw = X_raw.reshape(1, -1)
                 
-        if self.feature_selector is not None:
-            X = self.feature_selector.transform(X_raw)
-        else:
-            X = X_raw
-            
         predictions = Parallel(n_jobs=len(self.models), prefer="threads")(
-            delayed(self._predict_single_model)(model, X) for model in self.models
+            delayed(self._predict_single_model)(model, X_raw) for model in self.models
         )
         
         # Calculate explanations synchronously (could be parallelized but it's fast)
         explanations = []
         for model in self.models:
-            explanations.append(self._explain_single_model(model, X))
+            explanations.append(self._explain_single_model(model, X_raw))
                 
         base_preds = np.column_stack(predictions)
 

@@ -111,6 +111,7 @@ def _run_prediction(features: List[float], current_user, supabase: Optional[Clie
 
     previous_prediction = _find_previous_matching_prediction(current_user.id, features, supabase)
 
+    from app.ml.layer3_xai.gemini_service import generate_clinical_insight
     insight = generate_clinical_insight(
         final_risk_score=final_risk,
         base_model_predictions=base_model_dict,
@@ -164,30 +165,48 @@ def predict_oral_cancer(
 async def predict_oral_cancer_multimodal(
     histopathology_image: Optional[UploadFile] = File(default=None),
     intra_oral_image: Optional[UploadFile] = File(default=None),
-    clinical_data: Optional[str] = Form(default="{}"),
-    gene_data: Optional[str] = Form(default="{}"),
+    clinical_report: Optional[UploadFile] = File(default=None),
+    gene_report: Optional[UploadFile] = File(default=None),
     current_user=Depends(get_current_user),
     supabase: Optional[Client] = Depends(get_supabase),
 ):
+    intra_oral_bytes = None
+    histopathology_bytes = None
+    clin_bytes = None
+    gene_bytes = None
     try:
+        if not any([histopathology_image, intra_oral_image, clinical_report, gene_report]):
+            raise HTTPException(status_code=400, detail="Please upload at least one piece of patient data to run the analysis.")
+
+        # Read all uploaded files into memory
+        intra_oral_bytes     = await intra_oral_image.read()     if intra_oral_image     else None
         histopathology_bytes = await histopathology_image.read() if histopathology_image else None
-        intra_oral_bytes = await intra_oral_image.read() if intra_oral_image else None
+        clin_bytes           = await clinical_report.read()      if clinical_report      else None
+        gene_bytes           = await gene_report.read()          if gene_report          else None
 
-        clinical_payload = _parse_json_field(clinical_data, "clinical_data")
-        gene_payload = _parse_json_field(gene_data, "gene_data")
+        from app.ml.layer3_xai.gemini_service import gemini_multimodal_prediction
 
-        histopathology_score = histopathology_vision_model(histopathology_bytes)
-        intra_oral_score = intra_oral_vision_model(intra_oral_bytes)
-
-        features = pipeline_instance.build_multimodal_features(
-            clinical_data=clinical_payload,
-            gene_data=gene_payload,
-            histopathology_score=histopathology_score,
-            intra_oral_score=intra_oral_score,
+        # Always route directly to Gemini Vision — local PyTorch weights not available
+        f_risk, b_preds, ext_att, f_deps, c_insight = gemini_multimodal_prediction(
+            intra_oral_bytes, histopathology_bytes, clin_bytes, gene_bytes
         )
 
-        return _run_prediction(features, current_user, supabase)
+        return PredictionResponse(
+            final_risk_score=f_risk,
+            base_model_predictions=b_preds,
+            explainability_attention=ext_att,
+            feature_dependencies=f_deps,
+            patient_id=current_user.id,
+            clinical_insight=c_insight,
+        )
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if histopathology_image: await histopathology_image.close()
+        if intra_oral_image:     await intra_oral_image.close()
+        if clinical_report:      await clinical_report.close()
+        if gene_report:          await gene_report.close()
+
