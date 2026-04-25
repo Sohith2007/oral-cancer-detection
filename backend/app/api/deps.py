@@ -15,6 +15,13 @@ def get_current_user(
     It takes the JWT token, verifies it with Supabase, and returns the User object.
     """
     token = credentials.credentials
+    
+    # Allow local development bypass
+    if token == "mock_token_for_dev":
+        class MockUser:
+            id = "mock_user_123"
+        return MockUser()
+        
     try:
         # Send the JWT token to Supabase to verify it and retrieve the user session
         user_response = supabase.auth.get_user(token)
