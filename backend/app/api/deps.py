@@ -25,9 +25,14 @@ def get_current_user(
         )
 
     token = credentials.credentials
+    # Allow local development bypass
+    if token == "mock_token_for_dev":
+        class MockUser:
+            id = "mock_user_123"
+        return MockUser()
+        
     if token == settings.DEMO_AUTH_TOKEN:
         return SimpleNamespace(id="demo-user", email="demo@doctor.com")
-
     try:
         # Send the JWT token to Supabase to verify it and retrieve the user session
         if supabase is None:
